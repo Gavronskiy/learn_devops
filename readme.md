@@ -29,3 +29,5 @@ pip install Flask
 ## Preview
 
 ![screenshot](preview.png)
+
+🚀 Redeploy triggered manually
