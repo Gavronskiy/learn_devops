@@ -1,70 +1,36 @@
-name: CI – Test Flask CRUD in Docker with MySQL
+name: 🚀 Deploy to EC2 via Docker Compose
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  test-app:
+  deploy:
     runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: rootpass
-          MYSQL_DATABASE: mydb
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Build Docker image
-      run: docker build -t flask-crud-app .
-
-    - name: Run app container in background
+    - name: Add SSH key
       run: |
-        docker run -d \
-          --name flask-crud-test \
-          -e MYSQL_HOST=mysql \
-          -e MYSQL_USER=root \
-          -e MYSQL_PASSWORD=rootpass \
-          -e MYSQL_DB=mydb \
-          -p 3000:3000 \
-          --network host \
-          flask-crud-app
+        echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
+        chmod 600 key.pem
 
-    - name: Wait for app to become ready
+    - name: Deploy via SSH
       run: |
-        echo "Waiting for app to be ready..."
-        for i in {1..10}; do
-          if curl -s http://localhost:3000 >/dev/null; then
-            echo "✅ App is up!"
-            exit 0
+        ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd ~/app || mkdir -p ~/app && cd ~/app
+          if [ ! -d "flask-crud-devops" ]; then
+            git clone https://github.com/Gavronskiy/flask-crud-devops.git
           else
-            echo "Waiting... ($i)"
-            sleep 5
+            cd flask-crud-devops && git pull
           fi
-        done
-        echo "❌ App did not start in time"
-        docker logs flask-crud-test
-        exit 1
-
-    - name: Clean up containers
-      if: always()
-      run: |
-        docker stop flask-crud-test || true
-        docker rm flask-crud-test || true
+          cd flask-crud-devops
+          docker compose down || true
+          docker compose pull || true
+          docker compose build
+          docker compose up -d
+        EOF
 
