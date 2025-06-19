@@ -4,7 +4,7 @@ services:
   web:
     build: .
     ports:
-      - "3000:3000"
+      - "5000:3000"  # EC2:5000 → Container:3000
     depends_on:
       - db
     environment:
@@ -23,7 +23,7 @@ services:
       MYSQL_DATABASE: mydb
     volumes:
       - db_data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # <-- ось це додай
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "3306:3306"
 
