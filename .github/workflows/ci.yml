@@ -10,13 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
 
       - name: Save EC2 private key
         run: |
@@ -26,15 +21,29 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no -i learning_devops.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-            cd ~/app || { mkdir ~/app && cd ~/app; }
+            cd ~/app || mkdir ~/app && cd ~/app
+
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }} .
             else
               git pull origin main
             fi
+
             docker compose down || true
             docker compose up -d --build
-            sleep 10
-            curl -f http://localhost:5000 || exit 1
+
+            echo "⏳ Waiting for Flask to respond..."
+            for i in {1..10}; do
+              if curl -s -f http://localhost:3000 > /dev/null; then
+                echo "✅ Flask is up!"
+                exit 0
+              else
+                echo "Waiting... attempt $i"
+                sleep 3
+              fi
+            done
+
+            echo "❌ Flask app did not respond after 30 seconds"
+            exit 1
           EOF
 
