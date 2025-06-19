@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -20,28 +20,20 @@ jobs:
 
       - name: Save EC2 private key
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > ec2_github_key_new.pem
-          chmod 400 ec2_github_key_new.pem
+          echo "${{ secrets.EC2_SSH_KEY }}" > learning_devops.pem
+          chmod 400 learning_devops.pem
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ec2_github_key_new.pem ubuntu@13.60.180.94 << 'EOF'
-            cd ~/app || mkdir ~/app && cd ~/app
-
-            # Pull latest changes from GitHub
+          ssh -o StrictHostKeyChecking=no -i learning_devops.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ~/app || { mkdir ~/app && cd ~/app; }
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }} .
             else
               git pull origin main
             fi
-
-            # Stop old containers (if running)
             docker compose down || true
-
-            # Start containers
             docker compose up -d --build
-
-            # Wait and check if app responds
             sleep 10
             curl -f http://localhost:5000 || exit 1
           EOF
