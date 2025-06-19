@@ -20,30 +20,26 @@ jobs:
 
       - name: Save EC2 private key
         run: |
-          echo "${{ secrets.EC2_SSH_KEY }}" > /home/runner/learning_devops.pem
-          chmod 400 /home/runner/learning_devops.pem
+          echo "${{ secrets.EC2_SSH_KEY }}" > learning_devops.pem
+          chmod 400 learning_devops.pem
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i /home/runner/learning_devops.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i learning_devops.pem ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
             cd ~/app || mkdir ~/app && cd ~/app
 
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }} .
             else
-              git pull origin main
+              git fetch origin main && git reset --hard origin/main
             fi
 
             docker compose down || true
             docker compose up -d --build
 
-            for i in {1..10}; do
-              if curl -s http://localhost:5000 > /dev/null; then
-                echo "✅ App is up"
-                break
-              fi
-              echo "⏳ Waiting for app..."
-              sleep 5
-            done
+            echo "⏳ Waiting 30 seconds for containers to start..."
+            sleep 30
+
+            curl -f http://localhost:5000 || exit 1
           EOF
 
